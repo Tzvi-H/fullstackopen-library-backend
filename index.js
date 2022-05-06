@@ -1,6 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const { ApolloServer, gql } = require("apollo-server");
+const { ApolloServer, gql, UserInputError } = require("apollo-server");
 
 const Author = require("./models/author");
 const Book = require("./models/book");
@@ -82,25 +82,35 @@ const resolvers = {
   Mutation: {
     addBook: async (root, args) => {
       let author = await Author.findOne({ name: args.author });
+      try {
+        if (!author) {
+          author = new Author({ name: args.author });
+          await author.save();
+        }
 
-      if (!author) {
-        author = new Author({ name: args.author });
-        await author.save();
+        const newBook = new Book({
+          ...args,
+          author,
+        });
+        return newBook.save();
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
       }
-
-      const newBook = new Book({
-        ...args,
-        author,
-      });
-      return newBook.save();
     },
     editAuthor: async (root, args) => {
       const author = await Author.findOne({ name: args.name });
 
       if (!author) return null;
-
-      author.born = args.setBornTo;
-      return author.save();
+      try {
+        author.born = args.setBornTo;
+        return author.save();
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
+      }
     },
   },
 };
